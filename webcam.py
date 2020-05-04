@@ -33,28 +33,49 @@ class webcam_gauge:
 
     def calc_angle(self,x1,y1,x2,y2):
         if x2==x1 :
-            return -np.pi/2.
+            return np.pi/2.
         else:
             angle = np.arctan((y2-y1)/(x2-x1))
-            return angle - np.pi
+            return angle
+    def angle_range(self,gauge,angle):
+        if gauge == 'A' or gauge == 'a':
+            if ( angle < np.pi/2./90.*10. ):
+                angle = angle - np.pi
+            if ( angle > np.pi/2./90*10. ):
+                angle = -np.pi*2+angle
+
+        elif gauge == 'B' or gauge == 'b':
+            if ( angle > np.pi/2./90*10.):
+                 angle = angle -np.pi
+        return angle
     
+    def find_binary_threshold(self,img):
+        tmp = np.copy(img)
+        tmp_1dim = np.ravel(tmp)
+        tmp_sorted = np.sort(tmp_1dim)
+        thresh = tmp_sorted[len(tmp_sorted)-150]
+        return thresh
+
     def read_gauge(self,gauge : str):
         g = webcam_subgauge(gauge)
         x1,y1 = g.get_center()
         r = g.get_radius()
         copied = self.put_mask_circle(self.img_rev,x1,y1,r)
         copied2 = copied[y1-r:y1+r,x1-r:x1+r]
-
-        lines = cv2.HoughLinesP(copied2,rho=1,
+        thresh = self.find_binary_threshold(copied2)
+        ret, copied3 = cv2.threshold(copied2,thresh,255,cv2.THRESH_BINARY)
+        
+        lines = cv2.HoughLinesP(copied3,rho=1,
                                 theta=np.pi/360,
                                 threshold = 10,
                                 minLineLength = 20,
                                 maxLineGap = 20)
         for x1,y1,x2,y2 in lines[0]:
-            cv2.line(copied2,(x1,y1),(x2,y2),color=(120,120,120),thickness =1)
+            cv2.line(copied3,(x1,y1),(x2,y2),color=(120,120,120),thickness =1)
             angle = self.calc_angle(x1,y1,x2,y2)
-            print ('angle {}'.format(angle))
-            press = g.angle_pressure(angle)
+            angle2 = self.angle_range(gauge,angle)
+            print ('angle {} -> {}'.format(angle,angle2))
+            press = g.angle_pressure(angle2)
             print ('pressure {}'.format(press))
 
         
@@ -73,7 +94,7 @@ class webcam_subgauge:
         elif gauge == "A" or gauge == 'a' :
             self.center = 96,101
             self.radius = 17
-            self.ticks = 1.55-2*np, 2.61-2*np.pi, -2.65, -1.73
+            self.ticks = 1.55-2*np.pi, 2.61-2*np.pi, -2.65, -1.73
         else:
             print ('gauge identification invalid: {}'.format(gauge))
             raise ValueError
