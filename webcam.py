@@ -13,6 +13,8 @@ class webcam_gauge:
             raise ValueError
         self.img_gray = cv2.cvtColor(self.img,cv2.COLOR_BGR2GRAY)
         self.img_rev = cv2.bitwise_not(self.img_gray)
+        self.img_gauge = np.array([0])
+        self.img_gauge_bin = np.array([0])
 
     def print(self):
         """print itself"""
@@ -61,25 +63,27 @@ class webcam_gauge:
         x1,y1 = g.get_center()
         r = g.get_radius()
         copied = self.put_mask_circle(self.img_rev,x1,y1,r)
-        copied2 = copied[y1-r:y1+r,x1-r:x1+r]
-        thresh = self.find_binary_threshold(copied2)
-        ret, copied3 = cv2.threshold(copied2,thresh,255,cv2.THRESH_BINARY)
+        self.img_gauge = copied[y1-r:y1+r,x1-r:x1+r]
+        thresh = self.find_binary_threshold(self.img_gauge)
+        ret, self.img_gauge_bin = cv2.threshold(
+            self.img_gauge,thresh,255,cv2.THRESH_BINARY)
         
-        lines = cv2.HoughLinesP(copied3,rho=1,
+        lines = cv2.HoughLinesP(self.img_gauge_bin,rho=1,
                                 theta=np.pi/360,
                                 threshold = 10,
                                 minLineLength = 20,
                                 maxLineGap = 20)
         for x1,y1,x2,y2 in lines[0]:
-            cv2.line(copied3,(x1,y1),(x2,y2),color=(120,120,120),thickness =1)
+            cv2.line(self.img_gauge_bin,(x1,y1),(x2,y2),color=(120,120,120),thickness =1)
             angle = self.calc_angle(x1,y1,x2,y2)
             angle2 = self.angle_range(gauge,angle)
-            print ('angle {} -> {}'.format(angle,angle2))
+            print ('angle {:.5f} -> {:.5f}'.format(angle,angle2))
             press = g.angle_pressure(angle2)
-            print ('pressure {}'.format(press))
+            print ('pressure {:.2f}'.format(press))
 
-        
-
+    def show_img_bin(self):
+        plt.imshow(self.img_gauge_bin)
+        plt.show()
         
 ##################################################################
 #
